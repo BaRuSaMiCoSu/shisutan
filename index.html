@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>シス単 単語テストメーカー</title>
+<!-- PDF生成ライブラリ (html2pdf.js = html2canvas + jsPDF)。
+     HTMLを描画したまま画像としてPDF化するため、日本語が文字化けしません。 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+  :root {
+    --main: #2b6cb0;
+    --main-dark: #1a4e85;
+    --bg: #f0f4f8;
+    --border: #cbd5e0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+    background: var(--bg);
+    color: #222;
+    line-height: 1.6;
+  }
+  header {
+    background: var(--main);
+    color: #fff;
+    padding: 14px 20px;
+  }
+  header h1 { margin: 0; font-size: 1.25rem; }
+  header p  { margin: 2px 0 0; font-size: 0.8rem; opacity: 0.9; }
+  main { max-width: 900px; margin: 0 auto; padding: 16px; }
+
+  .card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 18px;
+    margin-bottom: 16px;
+  }
+  .card h2 {
+    margin: 0 0 10px;
+    font-size: 1rem;
+    border-left: 4px solid var(--main);
+    padding-left: 8px;
+  }
+  fieldset {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin: 0 0 12px;
+    padding: 8px 12px;
+  }
+  legend { font-size: 0.85rem; font-weight: bold; color: var(--main-dark); padding: 0 6px; }
+  label { margin-right: 14px; font-size: 0.92rem; cursor: pointer; }
+  input[type="number"] {
+    width: 80px; padding: 4px 6px;
+    border: 1px solid var(--border); border-radius: 4px; font-size: 0.95rem;
+  }
+  textarea {
+    width: 100%; min-height: 110px;
+    border: 1px solid var(--border); border-radius: 4px;
+    padding: 8px; font-size: 0.85rem; font-family: inherit;
+  }
+  button {
+    font-family: inherit;
+    font-size: 0.95rem;
+    padding: 9px 18px;
+    border: none; border-radius: 6px;
+    cursor: pointer;
+  }
+  .btn-primary { background: var(--main); color: #fff; }
+  .btn-primary:hover { background: var(--main-dark); }
+  .btn-secondary { background: #fff; color: var(--main-dark); border: 1px solid var(--main); }
+  .btn-secondary:hover { background: #e8f0fa; }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+  .note { font-size: 0.8rem; color: #666; }
+  #wordCountInfo { font-size: 0.85rem; color: var(--main-dark); font-weight: bold; }
+  details summary { cursor: pointer; font-weight: bold; font-size: 0.92rem; color: var(--main-dark); }
+
+  /* ===== テスト用紙(画面プレビュー & PDF共通) ===== */
+  #sheetWrap { display: none; }
+  .paper {
+    background: #fff;
+    width: 210mm;
+    min-height: 297mm;
+    max-width: 100%;
+    margin: 0 auto 16px;
+    padding: 15mm 14mm;
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  }
+  .paper h3 {
+    margin: 0 0 4px;
+    font-size: 1.15rem;
+    text-align: center;
+    letter-spacing: 0.1em;
+  }
+  .paper .meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    border-bottom: 2px solid #222;
+    padding-bottom: 6px;
+    margin-bottom: 10px;
+  }
+  .paper .nameline { letter-spacing: 0.05em; }
+  table.qtable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+  table.qtable th, table.qtable td {
+    border: 1px solid #444;
+    padding: 5px 8px;
+    vertical-align: middle;
+  }
+  table.qtable th { background: #eef3f8; font-weight: bold; text-align: center; }
+  td.qno { width: 34px; text-align: center; }
+  td.qword { width: 42%; }
+  td.qans { }
+  .choices { font-size: 0.85rem; }
+  .choices span { display: inline-block; margin-right: 14px; }
+  .anskey { column-count: 2; column-gap: 28px; font-size: 0.85rem; }
+  .anskey div { padding: 2px 0; border-bottom: 1px dotted #999; break-inside: avoid; }
+  .page-break { page-break-before: always; }
+
+  /* ===== 印刷時: 操作パネルを隠して用紙のみ出力 ===== */
+  @media print {
+    header, #controls, .btn-row, .no-print { display: none !important; }
+    body { background: #fff; }
+    main { max-width: none; padding: 0; }
+    #sheetWrap { display: block !important; }
+    .paper {
+      border: none; box-shadow: none;
+      width: auto; min-height: 0;
+      margin: 0; padding: 0;
+    }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>シス単 単語テストメーカー</h1>
+  <p>システム英単語レベルの単語からランダムにテストを作成し、PDFでダウンロードできます。</p>
+</header>
+
+<main>
+  <div id="controls">
+    <div class="card">
+      <h2>出題設定</h2>
+
+      <fieldset>
+        <legend>単語リスト</legend>
+        <label><input type="radio" name="listSrc" value="builtin" checked> 内蔵リスト(シス単レベル準拠)</label>
+        <label><input type="radio" name="listSrc" value="custom"> カスタムリスト</label>
+        <span id="wordCountInfo"></span>
+        <details style="margin-top:8px;">
+          <summary>カスタムリストの取り込み(サイトの表をコピペ)</summary>
+          <p class="note">
+            単語リストのページ(例: ukaru-eigo.com のシス単一覧表)で表を範囲選択してコピーし、
+            下の欄に貼り付けて「読み込む」を押してください。<br>
+            1行につき「番号(省略可) 英単語 意味」をタブ・カンマ・空白区切りで認識します。
+            読み込んだリストはこのブラウザに保存されます。
+          </p>
+          <textarea id="customInput" placeholder="例:&#10;1&#9;follow&#9;〜について行く、〜に従う&#10;2&#9;consider&#9;〜をよく考える&#10;または&#10;follow,〜について行く"></textarea>
+          <div class="btn-row">
+            <button type="button" class="btn-secondary" id="btnImport">読み込む</button>
+            <button type="button" class="btn-secondary" id="btnClearCustom">カスタムリストを削除</button>
+          </div>
+          <p class="note" id="importMsg"></p>
+        </details>
+      </fieldset>
+
+      <fieldset id="stageFs">
+        <legend>出題範囲(ステージ)</legend>
+        <label><input type="checkbox" class="stageChk" value="1" checked> Stage 1(基礎)</label>
+        <label><input type="checkbox" class="stageChk" value="2" checked> Stage 2(標準)</label>
+        <label><input type="checkbox" class="stageChk" value="3"> Stage 3(難関)</label>
+        <label><input type="checkbox" class="stageChk" value="4"> Stage 4(最難関)</label>
+        <br>
+        <label style="margin-top:6px; display:inline-block;">
+          番号範囲: <input type="number" id="rangeFrom" min="1" placeholder="1">
+          〜 <input type="number" id="rangeTo" min="1" placeholder="最後">
+          <span class="note">(空欄なら全範囲)</span>
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>出題形式</legend>
+        <label><input type="radio" name="mode" value="e2j" checked> 英語 → 日本語(記述)</label>
+        <label><input type="radio" name="mode" value="j2e"> 日本語 → 英語(記述)</label>
+        <label><input type="radio" name="mode" value="choice"> 英語 → 日本語(4択)</label>
+      </fieldset>
+
+      <fieldset>
+        <legend>問題数・その他</legend>
+        <label>問題数 <input type="number" id="numQ" min="1" max="100" value="20"></label>
+        <label><input type="checkbox" id="withAnswer" checked> 解答ページを付ける</label>
+        <label>タイトル <input type="text" id="testTitle" value="英単語テスト" style="padding:4px 6px; border:1px solid var(--border); border-radius:4px;"></label>
+      </fieldset>
+
+      <div class="btn-row">
+        <button type="button" class="btn-primary" id="btnGenerate">テストを作成する</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="sheetWrap">
+    <div class="btn-row no-print" style="margin-bottom:12px;">
+      <button type="button" class="btn-primary" id="btnPdf">PDFをダウンロード</button>
+      <button type="button" class="btn-secondary" id="btnPrint">印刷(ブラウザのPDF保存も可)</button>
+      <button type="button" class="btn-secondary" id="btnRegen">同じ設定で作り直す</button>
+    </div>
+    <div id="sheet"></div>
+  </div>
+</main>
+
+<script>
+"use strict";
+
+/* =====================================================================
+ * 内蔵単語リスト(システム英単語レベル準拠・約420語)
+ * 形式: [英単語, 意味]  ステージごとに配列を分け、通し番号は自動付与。
+ * ===================================================================== */
+const BUILTIN_STAGES = {
+  1: [
+    ["follow","〜について行く、〜に従う"],["consider","〜をよく考える"],["increase","増える、〜を増やす"],
+    ["expect","〜を予期する、〜を期待する"],["decide","〜を決める"],["develop","〜を発達させる、発達する"],
+    ["provide","〜を供給する、〜を提供する"],["continue","〜を続ける、続く"],["require","〜を必要とする、〜を要求する"],
+    ["allow","〜を許す、〜を可能にする"],["offer","〜を申し出る、〜を提供する"],["realize","〜に気づく、〜を実現する"],
+    ["suppose","〜だと思う、〜と仮定する"],["produce","〜を生産する"],["share","〜を共有する、〜を分け合う"],
+    ["describe","〜を描写する、〜を説明する"],["involve","〜を含む、〜を巻き込む"],["improve","〜を改善する、良くなる"],
+    ["mention","〜に言及する"],["regard","〜を(…と)みなす"],["notice","〜に気づく"],
+    ["wonder","〜だろうかと思う"],["suggest","〜を提案する、〜を示唆する"],["raise","〜を上げる、〜を育てる"],
+    ["tend","(〜する)傾向がある"],["relate","〜を関連づける"],["create","〜を創造する"],
+    ["receive","〜を受け取る"],["prepare","〜を準備する"],["reduce","〜を減らす"],
+    ["encourage","〜を励ます、〜を促す"],["prefer","〜のほうを好む"],["treat","〜を扱う、〜を治療する"],
+    ["establish","〜を設立する、〜を確立する"],["compare","〜を比べる"],["spread","〜を広げる、広がる"],
+    ["cause","〜を引き起こす/原因"],["remain","〜のままである、残る"],["affect","〜に影響を与える"],
+    ["argue","〜と主張する、議論する"],["publish","〜を出版する、〜を公表する"],["gain","〜を得る"],
+    ["feed","〜に食べ物を与える"],["seek","〜を探し求める"],["hide","〜を隠す、隠れる"],
+    ["achieve","〜を達成する"],["avoid","〜を避ける"],["decrease","減る、〜を減らす"],
+    ["maintain","〜を維持する、〜と主張する"],["refer","言及する、参照する"],["judge","〜を判断する/裁判官"],
+    ["claim","〜と主張する、〜を要求する"],["doubt","〜ではないと思う、〜を疑う"],["search","〜を捜索する、探す"],
+    ["exist","存在する"],["express","〜を表現する"],["discuss","〜について議論する"],
+    ["focus","焦点を合わせる、集中する"],["surround","〜を囲む"],["depend","頼る、(〜)次第である"],
+    ["respect","〜を尊敬する、〜を尊重する"],["appear","現れる、〜のように見える"],["marry","〜と結婚する"],
+    ["suffer","苦しむ、(苦痛など)を経験する"],["complete","〜を完成させる/完全な"],["connect","〜をつなぐ"],
+    ["contain","〜を含む"],["apply","〜を適用する、申し込む"],["fit","〜に合う"],
+    ["hurt","〜を傷つける"],["bear","〜に耐える、(子)を産む"],["waste","〜を浪費する"],
+    ["count","〜を数える、重要である"],["influence","〜に影響を及ぼす/影響"],["effect","効果、影響"],
+    ["situation","状況"],["environment","環境"],["skill","技能"],
+    ["research","研究、調査"],["experiment","実験"],["knowledge","知識"],
+    ["culture","文化"],["society","社会"],["century","世紀"],
+    ["technology","科学技術"],["evidence","証拠"],["theory","理論"],
+    ["subject","主題、科目、被験者"],["individual","個人/個々の"],["industry","産業"],
+    ["material","材料、物質"],["resource","資源"],["fuel","燃料"],
+    ["article","記事、品物"],["author","著者"],["novel","小説/斬新な"],
+    ["sentence","文、判決"],["term","期間、用語、(複数で)条件"],["topic","話題"],
+    ["feature","特徴/〜を特集する"],["opportunity","機会"],["purpose","目的"],
+    ["aim","目的、狙い/〜を狙う"],["means","手段"],["method","方法"],
+    ["project","計画、事業"],["task","仕事、課題"],["effort","努力"],
+    ["energy","エネルギー、活力"],["attitude","態度、考え方"],["behavior","行動、ふるまい"],
+    ["custom","慣習"],["habit","習慣、癖"],["sight","視力、光景"],
+    ["view","見解、眺め"],["scene","場面、現場"],["area","地域、領域"],
+    ["region","地域、地方"],["quality","質"],["quantity","量"],
+    ["rate","割合、速度、料金"],["amount","量、額"],["figure","数字、姿、人物"],
+    ["degree","程度、学位、(温度の)度"],["likely","ありそうな、〜しそうだ"],["certain","確信して、ある種の"],
+    ["various","さまざまな"],["similar","類似した"],["common","共通の、ふつうの"],
+    ["general","一般的な"],["particular","特定の"],["major","主要な/専攻"],
+    ["available","利用できる、手に入る"],["possible","可能な、ありうる"],["recent","最近の"],
+    ["correct","正しい/〜を訂正する"],["native","母国の、その土地固有の"],["physical","身体の、物理的な"],
+    ["mental","精神の"],["official","公式の/役人"],["positive","肯定的な、積極的な"],
+    ["negative","否定的な、消極的な"],["patient","忍耐強い/患者"],["ancient","古代の"],
+    ["modern","現代の"],["foreign","外国の"],["entire","全体の"],
+    ["several","いくつかの"],["therefore","それゆえに"],["although","〜だけれども"]
+  ],
+  2: [
+    ["occur","起こる"],["decline","減少する、〜を断る"],["demand","〜を要求する/需要"],
+    ["supply","〜を供給する/供給"],["insist","〜と主張する、要求する"],["indicate","〜を指し示す"],
+    ["represent","〜を代表する、〜を表す"],["recognize","〜を認識する、〜を認める"],["concentrate","集中する"],
+    ["determine","〜を決定する"],["observe","〜を観察する、〜と述べる"],["identify","〜を特定する、〜を識別する"],
+    ["survive","生き残る"],["ignore","〜を無視する"],["predict","〜を予測する"],
+    ["estimate","〜を見積もる"],["associate","〜を連想する、〜を結びつける"],["acquire","〜を習得する、〜を獲得する"],
+    ["adopt","〜を採用する、〜を養子にする"],["adapt","適応する、〜を適合させる"],["attach","〜を取り付ける"],
+    ["persuade","〜を説得する"],["convince","〜を確信させる、〜を納得させる"],["appreciate","〜を正しく評価する、〜に感謝する"],
+    ["recover","回復する"],["resemble","〜に似ている"],["struggle","奮闘する/闘い"],
+    ["manage","どうにか〜する、〜を管理する"],["operate","作動する、〜を操作する、手術する"],["handle","〜を処理する、〜を扱う"],
+    ["translate","〜を翻訳する"],["breathe","呼吸する"],["consume","〜を消費する"],
+    ["purchase","〜を購入する/購入"],["export","〜を輸出する"],["import","〜を輸入する"],
+    ["invest","〜を投資する"],["owe","〜に借りがある、〜のおかげである"],["afford","〜する余裕がある"],
+    ["earn","〜を稼ぐ"],["hire","〜を雇う"],["employ","〜を雇用する、〜を用いる"],
+    ["retire","引退する"],["quit","〜をやめる"],["found","〜を設立する"],
+    ["organize","〜を組織する、〜をまとめる"],["participate","参加する"],["attend","〜に出席する、世話をする"],
+    ["graduate","卒業する/卒業生"],["educate","〜を教育する"],["instruct","〜に指示する、〜に教える"],
+    ["inform","〜に知らせる"],["announce","〜を発表する"],["declare","〜を宣言する"],
+    ["admit","〜を(しぶしぶ)認める"],["deny","〜を否定する"],["refuse","〜を拒む"],
+    ["oppose","〜に反対する"],["blame","〜を非難する、〜のせいにする"],["accuse","〜を告発する、〜を非難する"],
+    ["punish","〜を罰する"],["forgive","〜を許す"],["praise","〜を褒める/称賛"],
+    ["admire","〜に感心する、〜を称賛する"],["envy","〜をうらやむ"],["bother","〜を悩ませる、わざわざ〜する"],
+    ["annoy","〜をいらいらさせる"],["frighten","〜を怖がらせる"],["scare","〜を怖がらせる"],
+    ["embarrass","〜を当惑させる"],["disappoint","〜を失望させる"],["satisfy","〜を満足させる"],
+    ["amuse","〜を楽しませる"],["attract","〜を引きつける"],["impress","〜に感銘を与える"],
+    ["inspire","〜を鼓舞する、〜を刺激する"],["motivate","〜に動機を与える"],["stimulate","〜を刺激する"],
+    ["account","説明、口座、勘定"],["advantage","有利な点"],["disadvantage","不利な点"],
+    ["benefit","利益/利益を得る"],["profit","利益"],["income","収入"],
+    ["tax","税金"],["debt","借金"],["wealth","富"],
+    ["poverty","貧困"],["population","人口"],["generation","世代"],
+    ["ancestor","祖先"],["descendant","子孫"],["neighborhood","近所"],
+    ["community","共同体、地域社会"],["government","政府"],["policy","政策、方針"],
+    ["politics","政治"],["economy","経済"],["trade","貿易、取引"],
+    ["agriculture","農業"],["crop","作物"],["harvest","収穫"],
+    ["climate","気候"],["temperature","温度、体温"],["atmosphere","大気、雰囲気"],
+    ["pollution","汚染"],["disaster","災害"],["earthquake","地震"],
+    ["flood","洪水"],["drought","干ばつ"],["disease","病気"],
+    ["symptom","症状"],["medicine","薬、医学"],["surgery","手術"],
+    ["cell","細胞、独房"],["brain","脳"],["oxygen","酸素"],
+    ["substance","物質"],["element","要素、元素"],["particle","粒子"],
+    ["gene","遺伝子"],["evolution","進化"],["species","(生物の)種"],
+    ["insect","昆虫"],["mammal","哺乳動物"],["efficient","効率的な"],
+    ["essential","必要不可欠な"],["obvious","明らかな"],["apparent","明らかな、外見上の"],
+    ["appropriate","適切な"],["accurate","正確な"],["precise","正確な、精密な"]
+  ],
+  3: [
+    ["abandon","〜を捨てる、〜を断念する"],["absorb","〜を吸収する"],["accompany","〜に同行する、〜に伴う"],
+    ["accomplish","〜を成し遂げる"],["accumulate","〜を蓄積する"],["acknowledge","〜を認める"],
+    ["alter","〜を変える"],["anticipate","〜を予期する"],["apologize","謝る"],
+    ["arise","生じる"],["assess","〜を評価する"],["assign","〜を割り当てる"],
+    ["assume","〜を当然と思う、〜を引き受ける"],["assure","〜に保証する"],["attribute","〜を(…の)せいにする/特性"],
+    ["calculate","〜を計算する"],["cease","〜をやめる、終わる"],["collapse","崩壊する/崩壊"],
+    ["commit","(罪など)を犯す、〜を委ねる"],["compensate","償う、補償する"],["compete","競争する"],
+    ["compose","〜を構成する、〜を作曲する"],["comprehend","〜を理解する"],["conclude","〜と結論づける"],
+    ["confess","〜を告白する"],["confirm","〜を確認する"],["confront","〜に立ち向かう、直面する"],
+    ["conquer","〜を征服する"],["constitute","〜を構成する"],["construct","〜を建設する"],
+    ["consult","〜に相談する、〜を調べる"],["contribute","貢献する、寄付する"],["convert","〜を転換する"],
+    ["cooperate","協力する"],["cope","(うまく)対処する"],["correspond","一致する、文通する"],
+    ["cultivate","〜を耕す、〜を養う"],["defeat","〜を打ち負かす/敗北"],["defend","〜を守る"],
+    ["define","〜を定義する"],["demonstrate","〜を証明する、デモをする"],["deprive","〜から(…を)奪う"],
+    ["derive","〜を引き出す、由来する"],["deserve","〜に値する"],["devote","〜をささげる"],
+    ["distinguish","〜を区別する"],["distribute","〜を分配する"],["disturb","〜を邪魔する"],
+    ["dominate","〜を支配する"],["eliminate","〜を除去する"],["emerge","現れる"],
+    ["emphasize","〜を強調する"],["enable","〜に(…することを)可能にさせる"],["endure","〜に耐える"],
+    ["enhance","〜を高める"],["ensure","〜を確実にする"],["evaluate","〜を評価する"],
+    ["exaggerate","〜を誇張する"],["exclude","〜を除外する"],["expand","〜を拡大する、広がる"],
+    ["exploit","〜を利用する、〜を搾取する"],["expose","〜をさらす、〜を暴露する"],["extend","〜を延長する、〜を広げる"],
+    ["facilitate","〜を容易にする"],["foster","〜を育成する、〜を促進する"],["generate","〜を生み出す"],
+    ["grasp","〜をつかむ、〜を理解する"],["guarantee","〜を保証する/保証"],["hesitate","ためらう"],
+    ["illustrate","〜を説明する、〜に挿絵を入れる"],["imitate","〜をまねる"],["imply","〜をほのめかす、〜を暗に意味する"],
+    ["impose","〜を課す、〜を押しつける"],["inherit","〜を相続する、〜を受け継ぐ"],["interpret","〜を解釈する、通訳する"],
+    ["interrupt","〜をさえぎる、〜を中断させる"],["invade","〜を侵略する"],["isolate","〜を孤立させる"],
+    ["justify","〜を正当化する"],["modify","〜を修正する"],["negotiate","交渉する"],
+    ["neglect","〜を怠る、〜を無視する"],["occupy","〜を占める"],["overcome","〜を克服する"],
+    ["perceive","〜を知覚する"],["possess","〜を所有する"],["postpone","〜を延期する"],
+    ["presume","〜と推定する"],["prohibit","〜を禁止する"],["promote","〜を促進する、〜を昇進させる"],
+    ["pursue","〜を追求する"]
+  ],
+  4: [
+    ["abolish","〜を廃止する"],["abrupt","突然の"],["adverse","不利な、逆の"],
+    ["aesthetic","美的な"],["alleviate","〜を緩和する"],["ambiguous","あいまいな"],
+    ["arrogant","傲慢な"],["articulate","〜をはっきり述べる/明瞭な"],["compassion","思いやり、同情"],
+    ["compelling","説得力のある、抗しがたい"],["comply","(規則などに)従う"],["concede","〜を(しぶしぶ)認める"],
+    ["condemn","〜を非難する"],["contemplate","〜を熟考する"],["contempt","軽蔑"],
+    ["contradict","〜と矛盾する、〜に反論する"],["counterpart","相当するもの[人]"],["deceive","〜をだます"],
+    ["degrade","〜の品位を下げる、劣化させる"],["deteriorate","悪化する"],["dilemma","ジレンマ、板ばさみ"],
+    ["diminish","減少する、〜を減らす"],["discard","〜を捨てる"],["disclose","〜を明らかにする"],
+    ["dismiss","〜を退ける、〜を解雇する"],["disperse","散らばる、〜を分散させる"],["disrupt","〜を混乱させる"],
+    ["distort","〜をゆがめる"],["divert","〜をそらす"],["embrace","〜を抱きしめる、〜を受け入れる"],
+    ["endeavor","努力/努力する"],["enroll","入学する、登録する"],["epidemic","流行(病)"],
+    ["evoke","〜を呼び起こす"],["feasible","実行可能な"],["hinder","〜を妨げる"],
+    ["implicit","暗黙の"],["induce","〜を引き起こす、〜を説得して…させる"],["inevitable","避けられない"],
+    ["infer","〜を推論する"],["intricate","複雑な"],["intrinsic","本来備わっている、固有の"],
+    ["legitimate","合法の、正当な"],["mandatory","義務的な、強制の"],["notorious","悪名高い"],
+    ["obscure","不明瞭な、無名の"],["plausible","もっともらしい"],["precede","〜に先行する"],
+    ["provoke","〜を挑発する、〜を引き起こす"],["refrain","控える"],["reluctant","気が進まない"],
+    ["retrieve","〜を取り戻す、〜を検索する"],["scrutiny","精査"],["subtle","微妙な、かすかな"],
+    ["succumb","屈する"],["tedious","退屈な"],["undermine","〜を徐々にむしばむ"],
+    ["verify","〜を検証する"],["vulnerable","傷つきやすい、脆弱な"]
+  ]
+};
+
+/* 内蔵リストを {no, word, meaning, stage} の一覧に展開(通し番号を自動付与) */
+const BUILTIN_WORDS = (() => {
+  const list = [];
+  let no = 1;
+  for (const stage of [1, 2, 3, 4]) {
+    for (const [word, meaning] of BUILTIN_STAGES[stage]) {
+      list.push({ no: no++, word, meaning, stage });
+    }
+  }
+  return list;
+})();
+
+const LS_KEY = "shisutan_custom_words";
+let customWords = loadCustom();
+let lastConfig = null; // 「同じ設定で作り直す」用
+
+/* ---------------- カスタムリスト ---------------- */
+function loadCustom() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function parseCustomText(text) {
+  const words = [];
+  let no = 1;
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    // タブ / カンマ / 連続空白 で分割
+    let parts = line.split(/\t|,|、|\s{2,}/).map(s => s.trim()).filter(Boolean);
+    if (parts.length < 2) {
+      // 「word 意味」のような半角スペース1つ区切り(先頭が英字の場合のみ)
+      const m = line.match(/^([A-Za-z][A-Za-z' .-]*)\s+(.+)$/);
+      if (m) parts = [m[1], m[2]];
+      else continue;
+    }
+    // 先頭が番号なら捨てて自前で振り直す
+    if (/^\d+[.)]?$/.test(parts[0])) parts.shift();
+    if (parts.length < 2) continue;
+    const word = parts[0];
+    const meaning = parts.slice(1).join(" ");
+    if (!/[A-Za-z]/.test(word)) continue; // 英字を含まない行はヘッダ等とみなす
+    words.push({ no: no++, word, meaning, stage: 0 });
+  }
+  return words;
+}
+
+/* ---------------- 出題プール ---------------- */
+function getPool() {
+  const src = document.querySelector('input[name="listSrc"]:checked').value;
+  let pool;
+  if (src === "custom") {
+    pool = customWords.slice();
+  } else {
+    const stages = Array.from(document.querySelectorAll(".stageChk:checked")).map(c => Number(c.value));
+    pool = BUILTIN_WORDS.filter(w => stages.includes(w.stage));
+  }
+  const from = Number(document.getElementById("rangeFrom").value) || 1;
+  const toRaw = Number(document.getElementById("rangeTo").value);
+  const to = toRaw > 0 ? toRaw : Infinity;
+  return pool.filter(w => w.no >= from && w.no <= to);
+}
+
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/* ---------------- テスト生成 ---------------- */
+function generateTest() {
+  const pool = getPool();
+  if (pool.length === 0) {
+    alert("出題できる単語がありません。リストや出題範囲の設定を確認してください。");
+    return;
+  }
+  const mode = document.querySelector('input[name="mode"]:checked').value;
+  if (mode === "choice" && pool.length < 4) {
+    alert("4択形式には最低4語必要です。出題範囲を広げてください。");
+    return;
+  }
+  let n = Math.max(1, Number(document.getElementById("numQ").value) || 20);
+  if (n > pool.length) {
+    n = pool.length;
+    document.getElementById("numQ").value = n;
+  }
+
+  const questions = shuffle(pool).slice(0, n).map(w => {
+    const q = { ...w };
+    if (mode === "choice") {
+      // 正解 + 他の単語の意味から誤答3つ
+      const wrong = shuffle(pool.filter(x => x.no !== w.no)).slice(0, 3).map(x => x.meaning);
+      q.choices = shuffle([w.meaning, ...wrong]);
+      q.answerIndex = q.choices.indexOf(w.meaning);
+    }
+    return q;
+  });
+
+  lastConfig = true;
+  renderSheet(questions, mode);
+}
+
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function renderSheet(questions, mode) {
+  const title = document.getElementById("testTitle").value || "英単語テスト";
+  const withAnswer = document.getElementById("withAnswer").checked;
+  const today = new Date();
+  const dateStr = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
+  const CIRCLED = ["①", "②", "③", "④"];
+
+  const modeLabel = {
+    e2j: "次の英単語の意味を日本語で書きなさい。",
+    j2e: "次の日本語の意味を表す英単語を書きなさい。",
+    choice: "次の英単語の意味として正しいものを1つ選び、番号で答えなさい。"
+  }[mode];
+
+  let rows = "";
+  questions.forEach((q, i) => {
+    if (mode === "e2j") {
+      rows += `<tr><td class="qno">${i + 1}</td><td class="qword">${esc(q.word)}</td><td class="qans">&nbsp;</td></tr>`;
+    } else if (mode === "j2e") {
+      rows += `<tr><td class="qno">${i + 1}</td><td class="qword">${esc(q.meaning)}</td><td class="qans">&nbsp;</td></tr>`;
+    } else {
+      const ch = q.choices.map((c, k) => `<span>${CIRCLED[k]} ${esc(c)}</span>`).join("");
+      rows += `<tr><td class="qno">${i + 1}</td><td class="qword"><b>${esc(q.word)}</b></td><td class="qans"><div class="choices">${ch}</div></td></tr>`;
+    }
+  });
+
+  const ansHeader = mode === "choice" ? "解答欄" : (mode === "j2e" ? "英単語" : "意味");
+  const qHeader = mode === "j2e" ? "日本語" : "英単語";
+
+  let html = `
+    <div class="paper" id="paperTest">
+      <h3>${esc(title)}</h3>
+      <div class="meta">
+        <span>${dateStr}</span>
+        <span class="nameline">年　　組　　番　氏名：＿＿＿＿＿＿＿＿＿＿＿＿　　点数：＿＿＿＿ / ${questions.length}</span>
+      </div>
+      <p style="font-size:0.9rem; margin:6px 0 10px;">【問題】${modeLabel}</p>
+      <table class="qtable">
+        <tr><th style="width:34px;">No.</th><th>${qHeader}</th><th>${ansHeader}</th></tr>
+        ${rows}
+      </table>
+    </div>`;
+
+  if (withAnswer) {
+    let ansRows = "";
+    questions.forEach((q, i) => {
+      let ans;
+      if (mode === "e2j") ans = `${esc(q.word)} … ${esc(q.meaning)}`;
+      else if (mode === "j2e") ans = `${esc(q.meaning)} … <b>${esc(q.word)}</b>`;
+      else ans = `${esc(q.word)} … ${CIRCLED[q.answerIndex]} ${esc(q.choices[q.answerIndex])}`;
+      ansRows += `<div>${i + 1}. ${ans}</div>`;
+    });
+    html += `
+    <div class="paper page-break" id="paperAnswer">
+      <h3>${esc(title)}〈解答〉</h3>
+      <div class="meta"><span>${dateStr}</span><span>全 ${questions.length} 問</span></div>
+      <div class="anskey">${ansRows}</div>
+    </div>`;
+  }
+
+  document.getElementById("sheet").innerHTML = html;
+  document.getElementById("sheetWrap").style.display = "block";
+  document.getElementById("sheetWrap").scrollIntoView({ behavior: "smooth" });
+}
+
+/* ---------------- PDF出力 ---------------- */
+function downloadPdf() {
+  if (typeof html2pdf === "undefined") {
+    alert("PDFライブラリを読み込めませんでした(オフラインの可能性があります)。\n「印刷」ボタンからブラウザの[PDFに保存]をご利用ください。");
+    return;
+  }
+  const sheet = document.getElementById("sheet");
+  const d = new Date();
+  const pad = x => String(x).padStart(2, "0");
+  const fname = `単語テスト_${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}.pdf`;
+
+  const btn = document.getElementById("btnPdf");
+  btn.disabled = true;
+  btn.textContent = "PDF作成中…";
+
+  html2pdf().set({
+    margin: [10, 8, 10, 8],
+    filename: fname,
+    image: { type: "jpeg", quality: 0.96 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+    pagebreak: { mode: ["css", "legacy"], before: ".page-break" }
+  }).from(sheet).save().finally(() => {
+    btn.disabled = false;
+    btn.textContent = "PDFをダウンロード";
+  });
+}
+
+/* ---------------- UI ---------------- */
+function updateWordCountInfo() {
+  const src = document.querySelector('input[name="listSrc"]:checked').value;
+  const info = document.getElementById("wordCountInfo");
+  if (src === "custom") {
+    info.textContent = customWords.length > 0
+      ? `カスタム: ${customWords.length} 語`
+      : "カスタムリストは未登録です";
+  } else {
+    info.textContent = `内蔵: ${BUILTIN_WORDS.length} 語`;
+  }
+  // カスタム使用時はステージ選択を無効化
+  const useCustom = src === "custom";
+  document.querySelectorAll(".stageChk").forEach(c => { c.disabled = useCustom; });
+}
+
+document.getElementById("btnGenerate").addEventListener("click", generateTest);
+document.getElementById("btnRegen").addEventListener("click", generateTest);
+document.getElementById("btnPdf").addEventListener("click", downloadPdf);
+document.getElementById("btnPrint").addEventListener("click", () => window.print());
+
+document.querySelectorAll('input[name="listSrc"]').forEach(r =>
+  r.addEventListener("change", updateWordCountInfo));
+
+document.getElementById("btnImport").addEventListener("click", () => {
+  const text = document.getElementById("customInput").value;
+  const words = parseCustomText(text);
+  const msg = document.getElementById("importMsg");
+  if (words.length === 0) {
+    msg.textContent = "読み込める行がありませんでした。「英単語 (区切り) 意味」の形式で貼り付けてください。";
+    return;
+  }
+  customWords = words;
+  localStorage.setItem(LS_KEY, JSON.stringify(words));
+  document.querySelector('input[name="listSrc"][value="custom"]').checked = true;
+  updateWordCountInfo();
+  msg.textContent = `${words.length} 語を読み込みました。カスタムリストに切り替えました。`;
+});
+
+document.getElementById("btnClearCustom").addEventListener("click", () => {
+  customWords = [];
+  localStorage.removeItem(LS_KEY);
+  document.querySelector('input[name="listSrc"][value="builtin"]').checked = true;
+  updateWordCountInfo();
+  document.getElementById("importMsg").textContent = "カスタムリストを削除しました。";
+});
+
+updateWordCountInfo();
+</script>
+</body>
+</html>
