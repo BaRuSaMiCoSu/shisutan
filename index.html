@@ -77,6 +77,64 @@
   #wordCountInfo { font-size: 0.85rem; color: var(--main-dark); font-weight: bold; }
   details summary { cursor: pointer; font-weight: bold; font-size: 0.92rem; color: var(--main-dark); }
 
+  /* ===== タブ ===== */
+  #tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  #tabs button {
+    background: #fff; color: var(--main-dark);
+    border: 1px solid var(--border); border-bottom-width: 3px;
+    font-weight: bold;
+  }
+  #tabs button.active { border-color: var(--main); background: #e8f0fa; }
+
+  /* ===== オンライン学習 ===== */
+  .quiz-word {
+    font-size: 1.7rem; font-weight: bold; text-align: center;
+    margin: 18px 0 6px; word-break: break-word;
+  }
+  .quiz-sub { text-align: center; color: #666; font-size: 0.85rem; margin-bottom: 14px; }
+  .choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 600px) { .choice-grid { grid-template-columns: 1fr; } }
+  .choice-btn {
+    background: #fff; border: 1px solid var(--border);
+    text-align: left; padding: 10px 12px; font-size: 0.92rem;
+  }
+  .choice-btn:hover:enabled { background: #e8f0fa; }
+  .choice-btn:disabled { cursor: default; }
+  .choice-btn.correct { background: #c6f6d5; border-color: #276749; }
+  .choice-btn.wrong   { background: #fed7d7; border-color: #c53030; }
+  #typingInput {
+    width: 100%; padding: 10px; font-size: 1.1rem;
+    border: 1px solid var(--border); border-radius: 6px;
+  }
+  #quizFeedback { min-height: 1.6em; font-weight: bold; margin: 10px 0 4px; }
+  #quizFeedback.ok { color: #276749; }
+  #quizFeedback.ng { color: #c53030; }
+  #quizProgress { font-size: 0.85rem; color: #666; }
+  .result-score { font-size: 2.2rem; font-weight: bold; text-align: center; margin: 8px 0; }
+  .result-rate  { text-align: center; color: #666; margin-bottom: 12px; }
+  table.wrongTable { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  table.wrongTable th, table.wrongTable td { border: 1px solid var(--border); padding: 5px 8px; }
+  table.wrongTable th { background: #eef3f8; }
+
+  /* 習得度メーター */
+  .mastery-row { display: flex; align-items: center; gap: 10px; margin: 6px 0; font-size: 0.88rem; }
+  .mastery-row .mlabel { width: 9.5em; }
+  .mastery-row .mval { width: 10em; text-align: right; color: #444; }
+  .meter { flex: 1; background: #e2e8f0; border-radius: 6px; height: 10px; overflow: hidden; }
+  .meter > div { background: var(--main); height: 100%; border-radius: 6px; }
+
+  /* 7日間グラフ(単一系列・正答率) */
+  .chart7 { display: flex; align-items: flex-end; gap: 10px; height: 130px; padding: 6px 4px 0; }
+  .chart7 .cbar { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; }
+  .cbar .val { font-size: 0.72rem; color: #444; margin-bottom: 2px; }
+  .cbar .bar { width: 70%; max-width: 36px; background: var(--main); border-radius: 4px 4px 0 0; }
+  .cbar .bar.empty { background: #e2e8f0; }
+  .chart7-days { display: flex; gap: 10px; padding: 4px 4px 0; border-top: 1px solid var(--border); }
+  .chart7-days span { flex: 1; text-align: center; font-size: 0.72rem; color: #777; }
+  table.histTable { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  table.histTable th, table.histTable td { border: 1px solid var(--border); padding: 4px 8px; text-align: center; }
+  table.histTable th { background: #eef3f8; }
+
   /* ===== テスト用紙(画面プレビュー & PDF共通) ===== */
   #sheetWrap { display: none; }
   .paper {
@@ -126,7 +184,8 @@
 
   /* ===== 印刷時: 操作パネルを隠して用紙のみ出力 ===== */
   @media print {
-    header, #controls, .btn-row, .no-print { display: none !important; }
+    header, #controls, .btn-row, .no-print, #tabs, #tabStudy { display: none !important; }
+    #tabPrint { display: block !important; }
     body { background: #fff; }
     main { max-width: none; padding: 0; }
     #sheetWrap { display: block !important; }
@@ -145,6 +204,12 @@
 </header>
 
 <main>
+  <nav id="tabs" class="no-print">
+    <button type="button" id="tabBtnPrint" class="active">📄 テスト印刷</button>
+    <button type="button" id="tabBtnStudy">🖥 オンライン学習</button>
+  </nav>
+
+  <div id="tabPrint">
   <div id="controls">
     <div class="card">
       <h2>出題設定</h2>
@@ -213,6 +278,85 @@
     </div>
     <div id="sheet"></div>
   </div>
+  </div><!-- /tabPrint -->
+
+  <div id="tabStudy" style="display:none;">
+    <div class="card" id="studySetup">
+      <h2>オンライン学習(自動採点)</h2>
+      <fieldset>
+        <legend>出題元</legend>
+        <label><input type="radio" name="qSource" value="normal" checked> 通常出題(ステージから)</label>
+        <label><input type="radio" name="qSource" value="srs"> SRS復習 <span class="note" id="srsDueInfo"></span></label>
+        <label><input type="radio" name="qSource" value="weak"> 弱点復習 <span class="note" id="weakInfo"></span></label>
+        <p class="note" style="margin:6px 0 0;">
+          SRS復習: 間違えた単語を3日後→1週間後→3週間後…の間隔で自動的に再出題します。
+          弱点復習: 前回間違えたままの単語をすぐに復習します。
+        </p>
+      </fieldset>
+      <fieldset id="qStageFs">
+        <legend>出題範囲(通常出題のとき)</legend>
+        <label><input type="checkbox" class="qStageChk" value="1" checked> Stage 1</label>
+        <label><input type="checkbox" class="qStageChk" value="2" checked> Stage 2</label>
+        <label><input type="checkbox" class="qStageChk" value="3"> Stage 3</label>
+        <label><input type="checkbox" class="qStageChk" value="4"> Stage 4</label>
+        <label><input type="checkbox" class="qStageChk" value="0"> カスタムリスト</label>
+      </fieldset>
+      <fieldset>
+        <legend>形式・問題数</legend>
+        <label><input type="radio" name="qMode" value="choice" checked> 4択(英→日)</label>
+        <label><input type="radio" name="qMode" value="typing"> 入力(日→英)</label>
+        <label>問題数 <input type="number" id="qNum" min="1" max="100" value="10"></label>
+      </fieldset>
+      <div class="btn-row">
+        <button type="button" class="btn-primary" id="btnStartQuiz">学習を開始する</button>
+      </div>
+    </div>
+
+    <div class="card" id="quizCard" style="display:none;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span id="quizProgress"></span>
+        <button type="button" class="btn-secondary" id="btnQuitQuiz" style="padding:4px 12px; font-size:0.8rem;">中断する</button>
+      </div>
+      <div class="quiz-word" id="quizWord"></div>
+      <div class="quiz-sub" id="quizSub"></div>
+      <div id="quizAnswerArea"></div>
+      <div id="quizFeedback"></div>
+      <div class="btn-row">
+        <button type="button" class="btn-secondary" id="btnDontKnow">分からない</button>
+        <button type="button" class="btn-primary" id="btnNext" style="display:none;">次へ</button>
+      </div>
+    </div>
+
+    <div class="card" id="resultCard" style="display:none;">
+      <h2>採点結果</h2>
+      <div class="result-score" id="resultScore"></div>
+      <div class="result-rate" id="resultRate"></div>
+      <div id="resultWrongArea"></div>
+      <div class="btn-row" style="margin-top:12px;">
+        <button type="button" class="btn-primary" id="btnRetryWrong" style="display:none;">間違えた単語だけ再挑戦</button>
+        <button type="button" class="btn-secondary" id="btnBackToSetup">設定に戻る</button>
+      </div>
+    </div>
+
+    <div class="card" id="statsCard">
+      <h2>学習記録</h2>
+      <fieldset>
+        <legend>習得度(1回以上正解した単語の割合)</legend>
+        <div id="masteryArea"></div>
+      </fieldset>
+      <fieldset>
+        <legend>この1週間の正答率</legend>
+        <div id="chart7Area"></div>
+      </fieldset>
+      <fieldset>
+        <legend>学習履歴(最新10件)</legend>
+        <div id="historyArea"></div>
+      </fieldset>
+      <div class="btn-row">
+        <button type="button" class="btn-secondary" id="btnResetStats">学習データをリセット</button>
+      </div>
+    </div>
+  </div><!-- /tabStudy -->
 </main>
 
 <script>
@@ -1492,6 +1636,361 @@ document.getElementById("btnClearCustom").addEventListener("click", () => {
 });
 
 updateWordCountInfo();
+
+/* =====================================================================
+ * オンライン学習(自動採点・SRS・学習記録)
+ * ===================================================================== */
+const SRS_KEY = "shisutan_srs";
+const HIST_KEY = "shisutan_history";
+const DAY = 24 * 60 * 60 * 1000;
+// 正解を重ねるごとの次回出題間隔(日): 3日→1週間→3週間→2か月→4か月
+const SRS_INTERVALS = [3, 7, 21, 60, 120];
+
+let srsData = loadJson(SRS_KEY, {});
+let histData = loadJson(HIST_KEY, []);
+let quiz = null; // {items, idx, correctCount, wrongItems, mode, source, answered}
+
+function loadJson(key, fallback) {
+  try {
+    const v = JSON.parse(localStorage.getItem(key));
+    return v ?? fallback;
+  } catch (e) { return fallback; }
+}
+function saveJson(key, v) { localStorage.setItem(key, JSON.stringify(v)); }
+
+/* 全単語(内蔵+カスタム)を word(小文字) → {word, meaning, stage} で引けるようにする */
+function allWordMap() {
+  const map = new Map();
+  for (const w of BUILTIN_WORDS) map.set(w.word.toLowerCase(), w);
+  for (const w of customWords) if (!map.has(w.word.toLowerCase())) map.set(w.word.toLowerCase(), w);
+  return map;
+}
+
+/* SRSへの成績記録: 正解→レベル+1で間隔を延ばす、不正解→レベル0に戻し3日後に再出題 */
+function srsRecord(word, ok) {
+  const key = word.toLowerCase();
+  const now = Date.now();
+  const e = srsData[key] || { l: 0, c: 0, w: 0, d: 0, t: 0 };
+  if (ok) {
+    e.l += 1;
+    e.c += 1;
+    e.d = now + SRS_INTERVALS[Math.min(e.l - 1, SRS_INTERVALS.length - 1)] * DAY;
+  } else {
+    e.l = 0;
+    e.w += 1;
+    e.d = now + 3 * DAY;
+  }
+  e.t = now;
+  srsData[key] = e;
+  saveJson(SRS_KEY, srsData);
+}
+
+function srsDueList() {
+  const map = allWordMap();
+  const now = Date.now();
+  return Object.entries(srsData)
+    .filter(([k, e]) => e.d <= now && map.has(k))
+    .sort((a, b) => a[1].d - b[1].d)
+    .map(([k]) => map.get(k));
+}
+
+function weakList() {
+  const map = allWordMap();
+  return Object.entries(srsData)
+    .filter(([k, e]) => e.w > 0 && e.l === 0 && map.has(k))
+    .map(([k]) => map.get(k));
+}
+
+/* ---------------- クイズ進行 ---------------- */
+function startQuiz(itemsOverride) {
+  const source = document.querySelector('input[name="qSource"]:checked').value;
+  const mode = document.querySelector('input[name="qMode"]:checked').value;
+  const n = Math.max(1, Number(document.getElementById("qNum").value) || 10);
+
+  let pool;
+  if (itemsOverride) {
+    pool = itemsOverride.slice();
+  } else if (source === "srs") {
+    pool = srsDueList();
+    if (pool.length === 0) { alert("復習期限が来た単語はありません。通常出題で学習しましょう。"); return; }
+  } else if (source === "weak") {
+    pool = shuffle(weakList());
+    if (pool.length === 0) { alert("弱点リストは空です。よくがんばりました!"); return; }
+  } else {
+    const stages = Array.from(document.querySelectorAll(".qStageChk:checked")).map(c => Number(c.value));
+    pool = BUILTIN_WORDS.filter(w => stages.includes(w.stage));
+    if (stages.includes(0)) pool = pool.concat(customWords);
+    if (pool.length === 0) { alert("出題範囲が選ばれていません。"); return; }
+    pool = shuffle(pool);
+  }
+  if (mode === "choice" && allWordMap().size < 4) { alert("4択には最低4語必要です。"); return; }
+
+  quiz = {
+    items: pool.slice(0, n),
+    idx: 0, correctCount: 0, wrongItems: [],
+    mode, source, answered: false
+  };
+  document.getElementById("studySetup").style.display = "none";
+  document.getElementById("resultCard").style.display = "none";
+  document.getElementById("quizCard").style.display = "block";
+  showQuestion();
+}
+
+function showQuestion() {
+  const q = quiz.items[quiz.idx];
+  quiz.answered = false;
+  document.getElementById("quizProgress").textContent = `第 ${quiz.idx + 1} 問 / 全 ${quiz.items.length} 問`;
+  const fb = document.getElementById("quizFeedback");
+  fb.textContent = ""; fb.className = "";
+  document.getElementById("btnNext").style.display = "none";
+  document.getElementById("btnDontKnow").style.display = "inline-block";
+  const area = document.getElementById("quizAnswerArea");
+
+  if (quiz.mode === "choice") {
+    document.getElementById("quizWord").textContent = q.word;
+    document.getElementById("quizSub").textContent = "正しい意味を選んでください";
+    // 誤答は全単語プールからランダムに3つ
+    const others = shuffle(Array.from(allWordMap().values()).filter(w => w.word !== q.word)).slice(0, 3);
+    const choices = shuffle([q, ...others]);
+    area.innerHTML = "";
+    const grid = document.createElement("div");
+    grid.className = "choice-grid";
+    choices.forEach(c => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "choice-btn";
+      b.textContent = c.meaning;
+      b.addEventListener("click", () => answerChoice(b, c, q));
+      grid.appendChild(b);
+    });
+    area.appendChild(grid);
+  } else {
+    document.getElementById("quizWord").textContent = q.meaning;
+    document.getElementById("quizSub").textContent = "この意味の英単語を入力してください";
+    area.innerHTML = `
+      <input type="text" id="typingInput" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="英単語を入力">
+      <div class="btn-row" style="margin-top:10px;">
+        <button type="button" class="btn-primary" id="btnAnswerTyping">答える</button>
+      </div>`;
+    const input = document.getElementById("typingInput");
+    input.focus();
+    // Enterで解答。stopPropagationで、document側の「Enterで次へ」が同じ打鍵で発火するのを防ぐ
+    input.addEventListener("keydown", e => {
+      if (e.key === "Enter" && !quiz.answered) {
+        e.preventDefault();
+        e.stopPropagation();
+        answerTyping(q);
+      }
+    });
+    document.getElementById("btnAnswerTyping").addEventListener("click", () => answerTyping(q));
+  }
+}
+
+function answerChoice(btn, chosen, q) {
+  if (quiz.answered) return;
+  const ok = chosen.word === q.word;
+  document.querySelectorAll(".choice-btn").forEach(b => {
+    b.disabled = true;
+    if (b.textContent === q.meaning) b.classList.add("correct");
+  });
+  if (!ok) btn.classList.add("wrong");
+  finishAnswer(q, ok, ok ? "正解!" : `不正解… 正解は「${q.meaning}」`);
+}
+
+function answerTyping(q) {
+  if (quiz.answered) return;
+  const val = (document.getElementById("typingInput").value || "").trim().toLowerCase();
+  if (!val) return;
+  const ok = val === q.word.toLowerCase();
+  document.getElementById("typingInput").disabled = true;
+  const ab = document.getElementById("btnAnswerTyping");
+  if (ab) ab.disabled = true;
+  finishAnswer(q, ok, ok ? "正解!" : `不正解… 正解は「${q.word}」`);
+}
+
+function dontKnow() {
+  if (!quiz || quiz.answered) return;
+  const q = quiz.items[quiz.idx];
+  if (quiz.mode === "choice") {
+    document.querySelectorAll(".choice-btn").forEach(b => {
+      b.disabled = true;
+      if (b.textContent === q.meaning) b.classList.add("correct");
+    });
+    finishAnswer(q, false, `正解は「${q.meaning}」— SRSに登録しました`);
+  } else {
+    const input = document.getElementById("typingInput");
+    if (input) input.disabled = true;
+    const ab = document.getElementById("btnAnswerTyping");
+    if (ab) ab.disabled = true;
+    finishAnswer(q, false, `正解は「${q.word}」— SRSに登録しました`);
+  }
+}
+
+function finishAnswer(q, ok, message) {
+  quiz.answered = true;
+  srsRecord(q.word, ok);
+  if (ok) quiz.correctCount += 1;
+  else quiz.wrongItems.push(q);
+  const fb = document.getElementById("quizFeedback");
+  fb.textContent = message;
+  fb.className = ok ? "ok" : "ng";
+  document.getElementById("btnDontKnow").style.display = "none";
+  const nextBtn = document.getElementById("btnNext");
+  nextBtn.style.display = "inline-block";
+  nextBtn.textContent = quiz.idx + 1 < quiz.items.length ? "次へ" : "結果を見る";
+}
+
+// 解答表示中にEnterで次へ進めるショートカット
+document.addEventListener("keydown", e => {
+  if (e.key === "Enter" && quiz && quiz.answered && !quiz.finished
+      && document.getElementById("quizCard").style.display !== "none") {
+    e.preventDefault();
+    nextQuestion();
+  }
+});
+
+function nextQuestion() {
+  if (!quiz || !quiz.answered || quiz.finished) return;
+  quiz.idx += 1;
+  if (quiz.idx < quiz.items.length) showQuestion();
+  else showResult();
+}
+
+function showResult() {
+  quiz.finished = true;
+  // 履歴に保存
+  histData.push({ d: Date.now(), mode: quiz.mode, source: quiz.source, n: quiz.items.length, c: quiz.correctCount });
+  saveJson(HIST_KEY, histData);
+
+  document.getElementById("quizCard").style.display = "none";
+  document.getElementById("resultCard").style.display = "block";
+  document.getElementById("studySetup").style.display = "block";
+  const n = quiz.items.length, c = quiz.correctCount;
+  const rate = Math.round(c / n * 100);
+  document.getElementById("resultScore").textContent = `${c} / ${n}`;
+  document.getElementById("resultRate").textContent = `正答率 ${rate}%`;
+
+  const wrongArea = document.getElementById("resultWrongArea");
+  if (quiz.wrongItems.length > 0) {
+    let rows = quiz.wrongItems.map(w =>
+      `<tr><td><b>${esc(w.word)}</b></td><td>${esc(w.meaning)}</td></tr>`).join("");
+    wrongArea.innerHTML = `
+      <p style="font-size:0.9rem;"><b>弱点復習リスト(今回間違えた単語)</b> — 3日後にSRS復習へ自動で再出題されます</p>
+      <table class="wrongTable"><tr><th>英単語</th><th>意味</th></tr>${rows}</table>`;
+    document.getElementById("btnRetryWrong").style.display = "inline-block";
+  } else {
+    wrongArea.innerHTML = `<p style="font-size:0.95rem;">全問正解です!🎉</p>`;
+    document.getElementById("btnRetryWrong").style.display = "none";
+  }
+  refreshStats();
+}
+
+function quitQuiz() {
+  quiz = null;
+  document.getElementById("quizCard").style.display = "none";
+  document.getElementById("studySetup").style.display = "block";
+  refreshStats();
+}
+
+/* ---------------- 学習記録の表示 ---------------- */
+function refreshStats() {
+  // SRS/弱点の件数表示
+  document.getElementById("srsDueInfo").textContent = `(本日 ${srsDueList().length} 語)`;
+  document.getElementById("weakInfo").textContent = `(${weakList().length} 語)`;
+
+  // 習得度: 1回以上正解(レベル1以上)の単語割合をステージ別に
+  const stageNames = { 1: "Stage 1(基礎)", 2: "Stage 2(標準)", 3: "Stage 3(難関)", 4: "Stage 4(最難関)", 0: "カスタム" };
+  const mArea = document.getElementById("masteryArea");
+  mArea.innerHTML = "";
+  const groups = [1, 2, 3, 4];
+  if (customWords.length > 0) groups.push(0);
+  for (const s of groups) {
+    const words = s === 0 ? customWords : BUILTIN_WORDS.filter(w => w.stage === s);
+    if (words.length === 0) continue;
+    const learned = words.filter(w => (srsData[w.word.toLowerCase()] || {}).l >= 1).length;
+    const pct = Math.round(learned / words.length * 100);
+    const pctLabel = learned > 0 && pct === 0 ? "1%未満" : pct + "%";
+    const barW = learned > 0 ? Math.max(pct, 1) : 0;
+    mArea.insertAdjacentHTML("beforeend", `
+      <div class="mastery-row">
+        <span class="mlabel">${stageNames[s]}</span>
+        <div class="meter"><div style="width:${barW}%"></div></div>
+        <span class="mval">習得度 ${pctLabel}(${learned}/${words.length})</span>
+      </div>`);
+  }
+
+  // 直近7日の正答率グラフ(単一系列)
+  const days = [];
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  for (let i = 6; i >= 0; i--) days.push(new Date(today.getTime() - i * DAY));
+  const agg = days.map(d => {
+    const from = d.getTime(), to = from + DAY;
+    let n = 0, c = 0;
+    for (const h of histData) if (h.d >= from && h.d < to) { n += h.n; c += h.c; }
+    return { n, c };
+  });
+  const bars = days.map((d, i) => {
+    const { n, c } = agg[i];
+    const rate = n > 0 ? Math.round(c / n * 100) : 0;
+    const h = n > 0 ? Math.max(4, rate) : 4;
+    const bar = n > 0
+      ? `<div class="bar" style="height:${h}%" title="${d.getMonth() + 1}/${d.getDate()}: ${n}問中${c}問正解(${rate}%)"></div>`
+      : `<div class="bar empty" style="height:4px" title="${d.getMonth() + 1}/${d.getDate()}: 学習なし"></div>`;
+    return `<div class="cbar"><span class="val">${n > 0 ? rate + "%" : "－"}</span>${bar}</div>`;
+  }).join("");
+  const dayLabels = days.map(d => `<span>${d.getMonth() + 1}/${d.getDate()}</span>`).join("");
+  document.getElementById("chart7Area").innerHTML =
+    `<div class="chart7">${bars}</div><div class="chart7-days">${dayLabels}</div>`;
+
+  // 履歴テーブル(最新10件)
+  const hArea = document.getElementById("historyArea");
+  if (histData.length === 0) {
+    hArea.innerHTML = `<p class="note">まだ学習履歴がありません。</p>`;
+  } else {
+    const modeNames = { choice: "4択", typing: "入力" };
+    const srcNames = { normal: "通常", srs: "SRS復習", weak: "弱点復習" };
+    const rows = histData.slice(-10).reverse().map(h => {
+      const d = new Date(h.d);
+      const rate = Math.round(h.c / h.n * 100);
+      return `<tr><td>${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}</td>
+        <td>${srcNames[h.source] || "-"}</td><td>${modeNames[h.mode] || "-"}</td>
+        <td>${h.c} / ${h.n}</td><td>${rate}%</td></tr>`;
+    }).join("");
+    hArea.innerHTML = `<table class="histTable">
+      <tr><th>日時</th><th>出題元</th><th>形式</th><th>得点</th><th>正答率</th></tr>${rows}</table>`;
+  }
+}
+
+/* ---------------- タブ・イベント ---------------- */
+function switchTab(study) {
+  document.getElementById("tabPrint").style.display = study ? "none" : "block";
+  document.getElementById("tabStudy").style.display = study ? "block" : "none";
+  document.getElementById("tabBtnPrint").classList.toggle("active", !study);
+  document.getElementById("tabBtnStudy").classList.toggle("active", study);
+  if (study) refreshStats();
+}
+document.getElementById("tabBtnPrint").addEventListener("click", () => switchTab(false));
+document.getElementById("tabBtnStudy").addEventListener("click", () => switchTab(true));
+
+document.getElementById("btnStartQuiz").addEventListener("click", () => startQuiz());
+document.getElementById("btnDontKnow").addEventListener("click", dontKnow);
+document.getElementById("btnNext").addEventListener("click", nextQuestion);
+document.getElementById("btnQuitQuiz").addEventListener("click", quitQuiz);
+document.getElementById("btnBackToSetup").addEventListener("click", () => {
+  document.getElementById("resultCard").style.display = "none";
+});
+document.getElementById("btnRetryWrong").addEventListener("click", () => {
+  if (quiz && quiz.wrongItems.length > 0) startQuiz(shuffle(quiz.wrongItems));
+});
+document.getElementById("btnResetStats").addEventListener("click", () => {
+  if (!confirm("学習履歴とSRSデータをすべて削除します。よろしいですか?")) return;
+  srsData = {}; histData = [];
+  localStorage.removeItem(SRS_KEY);
+  localStorage.removeItem(HIST_KEY);
+  refreshStats();
+});
+
+refreshStats();
 </script>
 </body>
 </html>
